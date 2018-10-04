@@ -1,1 +1,5 @@
 kafka-twitter-producer/conf/producer.conf
+
+# Python cache
+__pycache__
+.pyc
