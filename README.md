@@ -1,13 +1,13 @@
-#LSIEM
+# LSIEM
 
-> Big data-based SIEM(Security Information & Event Management)
+> Big data-based SIEM(Security Information & Event Management).
 > LSIEM's L means is linux and liwonace.
 
 ## Getting Started
 
 ### Prerequisites
 
-Server module is CentOS 7.5 x64 or higher Linux environment
+Server module is CentOS 7.5 x64 or higher Linux environment.
 Minimum disk space of 500 GB or more is required.
 
 
@@ -19,18 +19,26 @@ python get-pip.py
 ```
 
 beautifulsoup4
-* pip install beautifulsoup4a
+```bash
+pip install beautifulsoup4
+```
 
 paramiko-2.4.2
 bcrypt-3.1.4
 pynacl-1.3.0
 ```bash
-* pip install paramiko
+pip install paramiko
 ```
 
 kafka_2.12-1.1.0
 
 logstash 6.3.0
+
+java-1.8.0-openjdk
+```bash
+yum install java-1.8.0-openjdk-devel.x86_64
+
+```
 
 scp.py module
 * https://github.com/jbardin/scp.py
