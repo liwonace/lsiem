@@ -12,8 +12,6 @@ import kafka.producer.KeyedMessage;
 import java.util.Properties;
 import java.text.ParseException;
 
-
-
 /* 
  ------import library------ 
  
@@ -30,109 +28,105 @@ import java.text.ParseException;
  zookeeper-3.4.6.jar
  -------------------------
 */
-class application_thread extends Thread{
-	public void run() {
-		send_kafka css = new send_kafka();
-		String cmd = "cmd.exe /C wevtutil qe C:\\Windows\\System32\\winevt\\Logs\\Application.evtx /lf /f:text > C:\\Users\\shhong\\Desktop\\to_kafka\\Application.txt";
-		String read_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\Application.txt";
-		String write_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\logs";
-		String write_name = "win10-application.txt";
-		String topic = "win10-application";
-		
-		while(true){
-			css.syslog(read_path,write_name,write_path,topic,cmd);				
-		}				
-	}
-}
+class eventlog_thread extends Thread {
+	private String path;
+	private String kafka_host;
+	private String log_name;
+	private String write_name;
+	private String topic;
 
-class ntfs_thread extends Thread{
-	public void run() {
-		send_kafka css = new send_kafka();
-		String cmd = "cmd.exe /C wevtutil qe C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Ntfs%4Operational.evtx /lf /f:text > C:\\Users\\shhong\\Desktop\\to_kafka\\Microsoft-Windows-Ntfs%4Operational.txt";
-		String read_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\Microsoft-Windows-Ntfs%4Operational.txt";
-		String write_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\logs";
-		String write_name = "win10-ntfs.txt";
-		String topic = "win10-ntfs";
-		
-		while(true){
-			css.syslog(read_path,write_name,write_path,topic,cmd);				
-		}				
+	public eventlog_thread(String path, String kafka_host, String log_name) {
+		this.path = path;
+		this.kafka_host = kafka_host;
+		this.log_name = log_name;
 	}
-}
 
-class system_thread extends Thread{
 	public void run() {
 		send_kafka css = new send_kafka();
-		String cmd = "cmd.exe /c wevtutil qe C:\\Windows\\System32\\winevt\\Logs\\System.evtx /lf /f:text > C:\\Users\\shhong\\Desktop\\to_kafka\\System.txt";
-		String read_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\System.txt";
-		String write_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\logs";
-		String write_name = "win10-system.txt";
-		String topic = "win10-system";
-		
-		while(true){
-			css.syslog(read_path,write_name,write_path,topic,cmd);
-		}		
-	}
-}
+		String cmd = "cmd.exe /C wevtutil qe C:\\Windows\\System32\\winevt\\Logs\\" + log_name + ".evtx /lf /f:text > "
+				+ path + "\\" + log_name + ".txt";
+		String read_path = path + "\\" + log_name + ".txt";
+		String write_path = path + "\\logs";
 
-class security_thread extends Thread{
-	public void run() {
-		send_kafka css = new send_kafka();
-		String cmd = "cmd.exe /c wevtutil qe C:\\Windows\\System32\\winevt\\Logs\\Security.evtx /lf /f:text > C:\\Users\\shhong\\Desktop\\to_kafka\\Security.txt";
-		String read_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\Security.txt";
-		String write_path = "C:\\Users\\shhong\\Desktop\\to_kafka\\logs";
-		String write_name = "win10-security.txt";
-		String topic = "win10-security";
-		
-		while(true){
-			css.syslog(read_path,write_name,write_path,topic,cmd);
-		}		
+		System.out.println(cmd);
+		System.out.println(read_path);
+		System.out.println(write_path);
+
+		if (log_name.equals("Application")) {
+			write_name = "win10-application.txt";
+			topic = "win10-application";
+		} else if (log_name.equals("Microsoft-Windows-Ntfs%4Operational")) {
+			write_name = "win10-ntfs.txt";
+			topic = "win10-ntfs";
+		} else if (log_name.equals("System")) {
+			write_name = "win10-system.txt";
+			topic = "win10-system";
+		} else if (log_name.equals("Security")) {
+			write_name = "win10-security.txt";
+			topic = "win10-security";
+		}
+
+		while (true) {
+			css.syslog(read_path, write_name, write_path, topic, cmd, kafka_host);
+		}
 	}
 }
 
 public class Win_Producer {
 
 	public static void main(String[] args) throws IOException {
-		Thread application = new application_thread();
-		Thread security = new security_thread();
-		Thread system = new system_thread();
-		Thread ntfs = new ntfs_thread();
+		String s = null;
+		String line_read[] = new String[3];
+		int count = 0;
+		BufferedReader line_conf = new BufferedReader(new FileReader("producer.conf"));
+		while ((s = line_conf.readLine()) != null) {
+			String tmp[] = s.split("=");
+			line_read[count] = tmp[1];
+			count++;
+		}
+		line_conf.close();
+		//Thread application = new eventlog_thread(line_read[0], line_read[1], "Application");
+		Thread security = new eventlog_thread(line_read[0], line_read[1], "Security");
+		Thread system = new eventlog_thread(line_read[0], line_read[1], "System");
+		Thread ntfs = new eventlog_thread(line_read[0], line_read[1], "Microsoft-Windows-Ntfs%4Operational");
 
-		application.start();
+		//application.start();
 		security.start();
 		system.start();
 		ntfs.start();
 	}
 }
 
-class send_kafka{
+class send_kafka {
 	int err_check = 0;
-	public void syslog(String read_path, String write_name, String write_path, String topic,String cmd_evtx){
-		try{
+
+	public void syslog(String read_path, String write_name, String write_path, String topic, String cmd_evtx,
+			String kafka_host) {
+		try {
 			String last_line = null;
 			String s = null;
 			String path = write_path;
 			String file_name = write_name;
 			File w_path = new File(path);
-			File w_file = new File(path,file_name);
+			File w_file = new File(path, file_name);
 			String line_read = null;
-			int check = 0;			
+			int check = 0;
 			String send_str = null;
-			String before_s = " ";
-			int count = 0;			
-			
-			if(!w_path.exists()) {
+			int count = 0;
+
+			if (!w_path.exists()) {
 				w_path.mkdirs();
 			}
-			if(!w_file.exists()) {
+			if (!w_file.exists()) {
 				w_file.createNewFile();
 			}
+
 			Cmd cmd = new Cmd();
 			String result = cmd.execCommand(cmd_evtx);
-			Thread.sleep(10*1000);
-			
+			Thread.sleep(10 * 1000);
+
 			Properties configs = new Properties();
-			configs.put("bootstrap.servers", "192.168.7.70:9093");
+			configs.put("bootstrap.servers", kafka_host);
 			configs.put("acks", "all");
 			configs.put("block.on.buffer.full", "true");
 			configs.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -140,95 +134,96 @@ class send_kafka{
 
 			KafkaProducer<String, String> producer = new KafkaProducer<>(configs);
 			BufferedReader line_conf = new BufferedReader(new FileReader(w_file));
-			
+
 			while ((s = line_conf.readLine()) != null) {
-				line_read = s;				
+				line_read = s;
+				s = null;
 			}
 			line_conf.close();
 			BufferedReader conf = new BufferedReader(new FileReader(read_path));
-			while ((s = conf.readLine()) != null && before_s != null) {
-				if(s.contains("Event[")) {
-					if ((send_str != null && check == 1) || (send_str!= null && line_read == null)) {
-						System.out.println(send_str);
-						producer.send(new ProducerRecord<>(topic, send_str),
-						(metadata, exception) -> {
+			while ((s = conf.readLine()) != null) {
+				if (s.contains("Event[")) {
+					if ((send_str != null && check == 1) || (send_str != null && line_read == null)) {
+						producer.send(new ProducerRecord<>(topic, send_str), (metadata, exception) -> {
 							if (metadata != null) {
-								System.out.println(
-									"partition(" + metadata.partition() + "), offset(" + metadata.offset() + ")");								
+								System.out.println("partition(" + metadata.partition() + "), offset(" + metadata.offset() + ")");
 							} else {
 								exception.printStackTrace();
 								err_check = 1;
 							}
 						});
-						if(err_check == 0) {
+						if (err_check == 0) {
 							last_line = send_str;
-						}						
+							send_str = null;
+						}
 						producer.flush();
 					}
-					if(send_str != null && send_str.trim().equals(line_read)){
+					if (send_str != null && send_str.trim().equals(line_read)) {
 						check = 1;
-					}					
-					send_str = s;					
-				}else {
-					send_str += s;					
+					}
+					send_str = s;
+				} else {
+					send_str += s;
 				}
-				before_s = s;
 				count++;
+				s = null;
+			}
+
+			BufferedWriter out = new BufferedWriter(new FileWriter(w_file));
+			
+			if (last_line != null && last_line.length() != 0) {
+				out.write(last_line.trim());
+			} else if (count > 0 && check == 0 && line_read != null) {
+				out.write("");
+			} else {
+				out.write(line_read.trim());
 			}
 			
-			BufferedWriter out = new BufferedWriter(new FileWriter(w_file));
-			if(last_line != null && last_line.length() != 0){
-				out.write(last_line.trim());
-			}else if(count > 0 && check == 0 && line_read != null) {
-				out.write("");
-			}else{
-				out.write(line_read.trim());
-			}			
+			last_line = null;
+			path = null;
+			file_name = null;
+			w_path = null;
+			w_file = null;
+			line_read = null;
+			read_path = null;
+			write_name = null;
+			write_path = null;
+			topic = null;
+			cmd_evtx = null;
+			kafka_host = null;
+			
 			out.close();
-			conf.close();		
+			conf.close();
 			producer.close();
-		}catch (IOException e) {    	        
-    	}catch (NullPointerException e) {    	        
-    	}catch(InterruptedException e){
+		} catch (IOException e) {
+		} catch (NullPointerException e) {
+		} catch (InterruptedException e) {
 		}
 	}
 }
 
-class Cmd{
+class Cmd {
 	private Process process;
 	private BufferedReader bufferedReader;
 	private StringBuffer readBuffer;
-			
+
 	public String execCommand(String cmd) {
 		try {
 			process = Runtime.getRuntime().exec(cmd);
 			bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-			
-			String line =null;
+
+			String line = null;
 			readBuffer = new StringBuffer();
-			
-			while((line = bufferedReader.readLine()) != null) {
+
+			while ((line = bufferedReader.readLine()) != null) {
 				readBuffer.append(line);
 				System.out.println(line);
 				readBuffer.append("\n");
 			}
 			return readBuffer.toString();
-		}catch(Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return null;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
