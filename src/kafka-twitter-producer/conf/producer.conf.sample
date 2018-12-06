@@ -1,0 +1,12 @@
+# Reading From Twitter 
+consumerKey = 
+consumerSecret = 
+accessToken = 
+accessTokenSecret = 
+keywords = kim # don't know what for?
+
+# Kafka conf
+broker.list = .192.168.7.70:9092
+serializer.class = kafka.serializer.StringEncoder
+request.required.acks = 1
+kafka.topic = twitter
